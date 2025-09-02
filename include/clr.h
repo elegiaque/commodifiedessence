@@ -1,12 +1,7 @@
-#pragma once
-#pragma pack(push, 8)
-
-#include <unknwn.h> // Defines IUnknown, the base of all COM interfaces
-#include <oaidl.h>  // Defines IDispatch, VARIANT, BSTR, SAFEARRAY, and other OLE Automation types
+#include <unknwn.h>
+#include <oaidl.h>
 
 namespace mscorlib {
-// --- Forward Declarations for Referenced Interfaces and Structs ---
-// These declarations are sufficient for types only used as pointers in method signatures.
 struct _Assembly;
 struct _AssemblyName;
 struct _AssemblyBuilder;
@@ -38,9 +33,6 @@ struct _UnhandledExceptionEventHandler;
 struct _Version;
 struct ICustomAttributeProvider;
 struct IPrincipal;
-
-// --- Full Definitions for Required Enums and Structs ---
-// These types are required for method parameters or return values and cannot be forward-declared.
 
 enum AssemblyBuilderAccess : int
 {
@@ -525,6 +517,4 @@ _MethodInfo : IUnknown
     //virtual HRESULT __stdcall get_ReturnTypeCustomAttributes(struct ICustomAttributeProvider** pRetVal) = 0;
     //virtual HRESULT __stdcall GetBaseDefinition(struct _MethodInfo** pRetVal) = 0;
 };
-} // namespace mscorlib
-
-#pragma pack(pop)
+}
