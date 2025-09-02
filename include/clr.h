@@ -1,6 +1,8 @@
 #include <unknwn.h>
 #include <oaidl.h>
 
+//thanks gemini
+
 namespace mscorlib {
 struct _Assembly;
 struct _AssemblyName;
