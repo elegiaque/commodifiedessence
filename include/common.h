@@ -132,10 +132,15 @@ namespace stardust
 
         ) -> BOOL;
 
-        auto invokeASM(
+        auto loadASM(
             ICorRuntimeHost* pICorRuntimeHost,
             BYTE* pData,
-            DWORD cbData
+            DWORD cbData,
+            mscorlib::_Assembly** pAssembly
+        ) -> BOOL;
+
+        auto invokeASM(
+            mscorlib::_Assembly* pAssembly
         ) -> BOOL;
     };
 

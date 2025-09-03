@@ -1,9 +1,8 @@
 #include <unknwn.h>
 #include <oaidl.h>
 
-//thanks gemini
-
 namespace mscorlib {
+
 struct _Assembly;
 struct _AssemblyName;
 struct _AssemblyBuilder;
@@ -35,6 +34,8 @@ struct _UnhandledExceptionEventHandler;
 struct _Version;
 struct ICustomAttributeProvider;
 struct IPrincipal;
+
+// thanks gemini
 
 enum AssemblyBuilderAccess : int
 {

